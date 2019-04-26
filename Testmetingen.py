@@ -28,5 +28,5 @@ d = R - np.sqrt(R**2 - (schatter/2)**2)
 n = 1 #brekingsindex stof tussen de lens en glasplaatje
 labda = 546.08 # We werkem met het groene filter
 
-fi = (2*n*d)/labda + 1/2
-print ("fi =",fi) # wanneer fi = 0.5 hebben we uitdoving
+k = (2*n*d)/labda + 1/2
+print ("k =",k) # wanneer k = 0.5 hebben we uitdoving
