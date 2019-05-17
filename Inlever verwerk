@@ -146,10 +146,7 @@ def odrfunc(naam, cons):
     
     # Hier plotten we ter controle de aanpassing met de dataset
     xplot=np.linspace(0, 25, num=100)
-    ax.plot(x= xplot,
-            y = (par_best[0] * xplot), 
-            fmt= 'r-', 
-            label="linefit")
+    ax.plot(xplot, (par_best[0] * xplot), 'r-', label="linefit")
     ax.legend()
     plt.savefig("ODR_bij_{}.pdf".format(cons))
     return odr_res.beta, odr_res.sd_beta 
