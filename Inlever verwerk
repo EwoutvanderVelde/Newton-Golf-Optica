@@ -1,0 +1,220 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May  3 09:31:41 2019
+
+@author: Ewout van der Velde
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sympy import *
+import scipy.odr as odr
+
+
+labda = 522.08e-9
+sig_labda = 0
+
+
+class Kromte:                   
+    # In deze klas staan alle gegevens van de Kromtestraal van de lens
+    # Formule voor de kromte straal is a^2/6d + d/2
+    
+    # Meetresulaten in m
+    Lens = np.array([2.445e-3, 2.440e-3, 2.445e-3, 2.445e-3, 2.445e-3, 2.445e-3])
+    Vlak = np.array([2.260e-3, 2.265e-3, 2.265e-3, 2.265e-3, 2.265e-3, 2.265e-3])
+    a_meet = np.array([28.1e-3, 28.2e-3, 29.1e-3])
+    
+    a = np.mean(a_meet) # Gegeven in prakticumhandleiding dat a zo berekend wordt
+    a_std = 0.0001 # geschatte meetfout
+    
+    d_meet = Lens - Vlak # Verschil tussen vlakke tafel en lens om de dikte uit te rekenen
+    d = np.mean(d_meet) # gemiddelde om zo nauwkeurig mogelijk te zijn
+    d_std = np.std(d_meet, ddof=1)/np.sqrt(len(d_meet))   # Standaard deviatie berekenen
+    
+    
+data1 = np.genfromtxt("Metingen2.dat")   # inlezen van de meetwaarden
+
+
+def addstraal(data):
+    # Deze functie beerekend de straal van de cirkels en voegt deze toe aan de array
+    grote_lat = data[:,4]
+    kleine_lat = data[:,2]
+    grote_wiel = data[:,5]
+    kleine_wiel = data[:,3]
+    
+    straal = (((grote_lat+grote_wiel/200) - (kleine_lat+kleine_wiel/200))/1000)/2   # Straal wordt berekend
+    straal = np.reshape(straal, [len(straal), 1]) # Array vervormen zodat deze samengevoegd kan worden
+    return np.concatenate((data, straal), axis =1) # Array samenvoegen met de ingelezen data
+
+
+data1 = addstraal(data1)    
+
+
+def cons(c, data):
+    # Functie om concentraties te groeperen
+    mask = (data[:,0] == c)
+    return data[mask] 
+
+
+class meet1:
+    # Alle meetwaarden per concentratie ordenen
+    data = data1 
+    c0 = cons(0, data)
+    c25 = cons(25, data)
+    c50 = cons(50, data)
+    c75 = cons(75, data)
+    c100 = cons(100, data)
+    c125 = cons(125, data)
+    c150 = cons(150, data)
+    c175 = cons(175, data)
+    c200 = cons(200, data)
+    c225 = cons(225, data)
+    c250 = cons(250, data)
+
+
+# Vervolgens plotten we alle meetresultaten in een grafiek. 
+plt.figure("Meting")
+plt.title("Meetresultaten")
+plt.ylabel("$r^2$ (mm$^2$)")
+plt.xlabel("$k$")
+plt.scatter(x = meet1.c200[:,1],
+            y = ((meet1.c200[:,6])**2)*1000000, 
+            label = "C200")
+plt.scatter(x = meet1.c150[:,1],
+            y = ((meet1.c150[:,6])**2)*1000000, 
+            label="C150")
+plt.scatter(x = meet1.c100[:,1],
+            y = ((meet1.c100[:,6])**2)*1000000, 
+            label="C100")
+plt.scatter(x = meet1.c50[:,1],
+            y = ((meet1.c50[:,6])**2)*1000000, 
+            label="C50")
+plt.scatter(x = meet1.c0[:,1],
+            y = ((meet1.c0[:,6])**2)*1000000, 
+            label="C0")
+plt.legend()
+plt.savefig("Meetresultaten_scatter.pdf")
+plt.show("Meting")
+
+
+def odrfunc(naam, cons): 
+    
+    # x, y en sigy definieren voor ODR
+    y = (((naam[:,6]).flatten())**2)
+    x = (naam[:,1]).flatten()
+    sig_yt = (np.zeros(len(naam[:,6])) + 0.000005) # Dit is de STD voor r
+    sig_y = sig_yt * 2 * np.sqrt(y) # Dit is de STD voor r^2
+
+    f,ax = plt.subplots(1)
+    ax.set_title(cons)
+    ax.set_xlabel("k")
+    ax.set_ylabel("r$^2$ ($m^2$)")
+    ax.errorbar(x = x,
+                y = y,
+                yerr = sig_y,
+                fmt = 'k.',
+                label = "meting")
+    
+    A_start= 0.0000001
+    B_start= 0.0001
+    
+    #  (1) Definieer een Python-functie die het model bevat, in dit geval een 
+    #  rechte lijn
+    #  B is een vector met parameters, in dit geval twee (A = B[0], B = B[1])
+    #  x is de array met x-waarden
+    def f(B, x):
+        return B[0] * x + B[1]
+    
+    odr_model = odr.Model(f)
+    odr_data  = odr.RealData(x,y,sy=sig_y)          # we hebben geen sx opgegeven aangezien er geen onzekerheid in de tijd aanwezig is
+    odr_obj   = odr.ODR(odr_data,odr_model,beta0=[A_start,B_start])
+    odr_obj.set_job(fit_type=2)                     # Definieer welke fit-functie je wil gebruiken
+    odr_res   = odr_obj.run()                       # Voer de Fit functie uit
+    par_best = odr_res.beta                         # vraag de beste schatter op
+    
+    #par_sig_ext = odr_res.sd_beta                   # de externe onzerheden
+    #par_cov = odr_res.cov_beta                      # de interne covariantiematrix    
+    #print(" De (INTERNE!) covariantiematrix  = \n", par_cov)
+    #chi2 = odr_res.sum_square
+    #print("\n Chi-squared         = ", chi2)
+    
+    chi2red = odr_res.res_var
+    print("\n", " Reduced chi-squared = ", chi2red)
+    
+    # (6e) Een compacte weergave van de belangrijkste resultaten als output
+    #odr_res.pprint()
+    
+    # Hier plotten we ter controle de aanpassing met de dataset
+    xplot=np.linspace(0, 25, num=100)
+    ax.plot(x= xplot,
+            y = (par_best[0] * xplot), 
+            fmt= 'r-', 
+            label="linefit")
+    ax.legend()
+    plt.savefig("ODR_bij_{}.pdf".format(cons))
+    return odr_res.beta, odr_res.sd_beta 
+
+
+def n(naam, cons):
+    # Deze functie berekend de brekingsindex met onzekerheiden middels de differentiatie methode
+    b , std = odrfunc(naam, cons)
+    Hel = Symbol("Hel")
+    a = Symbol("a")
+    d = Symbol("d")
+    lab = Symbol("lab")
+    
+    n = 1/((Hel)/(((a**2)/(6*d) + d/2)*lab))
+    
+    Hel_best = b[0]
+    sig_Hel = std[0]
+    
+    a_best = Kromte.a
+    sig_a = Kromte.a_std
+    
+    d_best = Kromte.d
+    sig_d = Kromte.d_std
+    
+    lab_best = labda
+    sig_lab = sig_labda
+    
+    n_best = n.subs([(a, a_best), (d, d_best), (Hel, Hel_best), (lab, lab_best)])
+    
+    n_sig_Hel = sig_Hel*diff(n, Hel).subs([(a, a_best), (d, d_best), (Hel, Hel_best), (lab, lab_best)])
+    n_sig_lab = sig_lab*diff(n, lab).subs([(a, a_best), (d, d_best), (Hel, Hel_best), (lab, lab_best)])
+    n_sig_d = sig_d*diff(n, d).subs([(a, a_best), (d, d_best), (Hel, Hel_best), (lab, lab_best)])
+    n_sig_a = sig_a*diff(n, a).subs([(a, a_best), (d, d_best), (Hel, Hel_best), (lab, lab_best)])
+    print(n_sig_Hel, n_sig_lab, n_sig_d, n_sig_a)
+    
+    n_sig = sqrt(n_sig_Hel**2 + n_sig_lab**2 + n_sig_d**2 + n_sig_a**2)
+    print("{} geeft n = {} ± {} ".format(cons, n_best, n_sig))
+    return naam[1,0], n_best, n_sig
+
+# Opslaan van de resultaten aan verschillende variabelen
+c1 , n1 ,s1 = n(meet1.c0, "C0")
+c2 , n2 ,s2 = n(meet1.c50, "C50")
+c3 , n3 ,s3 = n(meet1.c100, "C100")
+c4 , n4 ,s4 = n(meet1.c150, "C150")
+c5 , n5 ,s5 = n(meet1.c200, "C200")
+
+
+plt.figure("n")
+plt.title("Brekingsindex bij verschillende concentraties")
+plt.xlabel("Concentratie ($g/L$)")
+plt.ylabel("Brekingsindex n")
+plt.errorbar(x = [c1,c2,c3,c4,c5], 
+             y = [n1,n2,n3,n4,n5],
+             xerr = [1,1,1,1,1],
+             yerr = [s1,s2,s3,s4,s5],
+             fmt = "r.")
+plt.savefig("n_met_error_tegen_concentratie.pdf")
+plt.show("n")
+
+
+def save(naam, cons):
+    # Deze funcite is alleen gebruikt om de data latex klaar te maken
+    np.savetxt("{}.txt".format(cons), 
+               naam[:,:-1] ,
+               fmt = "%g",  
+               delimiter = " &\t", 
+               newline = "\\\\\n\\hline\n")
+    return
