@@ -1,0 +1,25 @@
+import numpy as np
+from scipy.stats import chi2
+
+r_630 = 2 #aantal parameters
+n_630 = 10 #aantal metingen
+waarde_630 = chi2.sf(0.601, n_630 - r_630, scale = 1/8 ) #schaling bij chi_red
+print("rechtzijdig 630 =", waarde_630) #Dit is de rechtzijdige overschrijdingskans
+print("linkswaarde 630 = ", (1 - waarde_630)* 100) #groter dan 5% dus consistent
+print("dus consistent") #1- ... omdat chi_red <1 en we willen dus linkszijdig
+
+r_616 = 2 #aantal parameters
+n_616 = 6 #aantal metingen
+waarde_616 = chi2.sf(0.601, n_616 - r_616, scale = 1/(n_616 - r_616)) #schaling omdat we met chi_red werken
+print("rechtzijdig 616 = ", waarde_616*100)
+print("dus consisitent")
+
+#de chi_red  = 0.99, dus linkszijdige overschrijding!
+
+r_630 = 2 #aantal parameters
+n_630 = len(data[:,1]) #aantal metingen
+
+waarde_630 = chi2.sf(0.99, n_630 - r_630, scale = 1/(n_630-r_630) ) #schaling bij chi_red
+print("rechtzijdig 630 =", waarde_630) #Dit is de rechtzijdige overschrijdingskans
+print("linkswaarde 630 = ", (1 - waarde_630)* 100) #groter dan 5% dus consistent
+print("dus consistent") #1- ... omdat chi_red <1 en we willen dus linkszijdig
